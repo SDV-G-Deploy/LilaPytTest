@@ -2,18 +2,26 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Glowing Red Spider Lily</title>
-    <link rel="stylesheet" href="style.css" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Procedural Red Spider Lily</title>
+    <meta
+      name="description"
+      content="A lightweight, mobile-friendly procedural glowing red spider lily demo in pure HTML/CSS/JS."
+    />
+    <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <canvas id="scene" aria-label="Animated procedural glowing red spider lily"></canvas>
+    <canvas id="scene" aria-label="Procedural red spider lily animation"></canvas>
 
-    <header class="overlay">
+    <div class="overlay" aria-hidden="true">
       <h1>Red Spider Lily</h1>
-      <p>Procedural glowing particle bloom inspired by Python renders.</p>
-    </header>
+      <p>procedural • one-page • no dependencies</p>
+      <p class="hint">tap/click to pause</p>
+    </div>
 
-    <script src="app.js"></script>
+    <script src="./app.js"></script>
   </body>
 </html>
