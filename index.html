@@ -6,20 +6,25 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <title>Procedural Red Spider Lily</title>
+    <title>Kislota Bloom Engine v0</title>
     <meta
       name="description"
-      content="A lightweight, mobile-friendly procedural glowing red spider lily demo in pure HTML/CSS/JS."
+      content="Template engine v0 for premium mobile-friendly procedural background animations in pure HTML/CSS/JS."
     />
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <canvas id="scene" aria-label="Procedural red spider lily animation"></canvas>
+    <canvas id="scene" aria-label="Procedural flower animation"></canvas>
 
-    <div class="overlay" aria-hidden="true">
-      <h1>Red Spider Lily</h1>
-      <p>procedural • one-page • no dependencies</p>
-      <p class="hint">tap/click to pause</p>
+    <div class="overlay" aria-live="polite">
+      <h1 id="scene-title">Kislota Bloom</h1>
+      <p id="scene-subtitle">template engine v0 • pure html/css/js</p>
+      <p class="hint">tap/click to pause • switch scene anytime</p>
+    </div>
+
+    <div class="scene-switcher" role="group" aria-label="Scene selector">
+      <label for="scene-select">Scene</label>
+      <select id="scene-select" aria-label="Select background scene"></select>
     </div>
 
     <script src="./app.js"></script>

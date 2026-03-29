@@ -1,9 +1,11 @@
 :root {
-  --bg-0: #040405;
-  --bg-1: #09070b;
-  --bg-2: #14070b;
-  --text: rgba(255, 240, 246, 0.9);
-  --muted: rgba(255, 220, 230, 0.58);
+  --bg-0: #050506;
+  --bg-1: #0a090d;
+  --bg-2: #120a11;
+  --text: rgba(245, 240, 255, 0.9);
+  --muted: rgba(218, 210, 244, 0.62);
+  --panel: rgba(11, 11, 17, 0.58);
+  --panel-border: rgba(210, 180, 255, 0.22);
 }
 
 * {
@@ -16,7 +18,7 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: radial-gradient(circle at 50% 35%, var(--bg-2), var(--bg-1) 48%, var(--bg-0));
+  background: radial-gradient(circle at 50% 32%, var(--bg-2), var(--bg-1) 48%, var(--bg-0));
   font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   color: var(--text);
 }
@@ -42,35 +44,85 @@ body {
   bottom: max(16px, env(safe-area-inset-bottom));
   pointer-events: none;
   user-select: none;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.46);
 }
 
 .overlay h1 {
   margin: 0;
-  font-size: clamp(18px, 3.8vw, 30px);
-  letter-spacing: 0.1em;
-  font-weight: 550;
+  font-size: clamp(18px, 3.9vw, 30px);
+  letter-spacing: 0.08em;
+  font-weight: 560;
 }
 
 .overlay p {
   margin: 5px 0 0;
   font-size: clamp(11px, 2.2vw, 14px);
   color: var(--muted);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
   text-transform: lowercase;
 }
 
 .overlay .hint {
-  opacity: 0.64;
+  opacity: 0.68;
+}
+
+.scene-switcher {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 11px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.scene-switcher label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.scene-switcher select {
+  appearance: none;
+  border: 1px solid rgba(200, 170, 255, 0.26);
+  background: rgba(15, 14, 25, 0.84);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 7px 24px 7px 10px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  min-width: 140px;
+  outline: none;
+}
+
+.scene-switcher select:focus-visible {
+  border-color: rgba(224, 198, 255, 0.56);
 }
 
 @media (max-width: 700px) {
   .overlay {
-    bottom: max(14px, env(safe-area-inset-bottom));
+    bottom: max(12px, env(safe-area-inset-bottom));
   }
 
-  .overlay h1 {
-    letter-spacing: 0.08em;
-    font-weight: 520;
+  .scene-switcher {
+    top: max(8px, env(safe-area-inset-top));
+    right: max(8px, env(safe-area-inset-right));
+    padding: 7px 8px;
+    gap: 6px;
+  }
+
+  .scene-switcher label {
+    display: none;
+  }
+
+  .scene-switcher select {
+    min-width: 132px;
+    font-size: 11px;
   }
 }
