@@ -4,9 +4,7 @@
   const canvas = document.getElementById('scene');
   const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
 
-  if (!ctx) {
-    throw new Error('2D canvas not available');
-  }
+  if (!ctx) throw new Error('2D canvas not available');
 
   const isMobile =
     matchMedia('(max-width: 900px)').matches ||
@@ -22,7 +20,15 @@
     budgetMs: isMobile ? 11.5 : 9.5,
     qualitySteps: [1, 0.92, 0.84, 0.76, 0.68, 0.62],
     particlesBase: isMobile ? 70 : 110,
-    particlesMin: isMobile ? 36 : 56
+    particlesMin: isMobile ? 36 : 56,
+    scaleCooldownMs: 4200
+  };
+
+  const scene = {
+    petalLayers: 2,
+    petalsPerLayer: 14,
+    bloomRadiusFactor: 0.155,
+    stemHeightFactor: 0.35
   };
 
   const state = {
@@ -39,38 +45,42 @@
     fpsInterval: 1000 / cfg.fpsTarget,
     overBudgetStreak: 0,
     underBudgetStreak: 0,
-    qualityIdx: 0
+    qualityIdx: 0,
+    lastScaleChangeAt: 0
   };
 
   let glowSprite = null;
   let petalSprite = null;
   let coreSprite = null;
+  let tipSprite = null;
+  let backgroundLayer = null;
+
+  function makeCanvas(w, h) {
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    return c;
+  }
 
   function makeGlowSprite(size = 256) {
-    const c = document.createElement('canvas');
-    c.width = c.height = size;
+    const c = makeCanvas(size, size);
     const g = c.getContext('2d');
-
     const r = size * 0.5;
     const grad = g.createRadialGradient(r, r, 0, r, r, r);
     grad.addColorStop(0, 'rgba(255, 92, 95, 0.34)');
     grad.addColorStop(0.36, 'rgba(255, 36, 40, 0.2)');
     grad.addColorStop(0.75, 'rgba(180, 20, 28, 0.08)');
     grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-
     g.fillStyle = grad;
     g.fillRect(0, 0, size, size);
     return c;
   }
 
   function makePetalSprite(w = 180, h = 42) {
-    const c = document.createElement('canvas');
-    c.width = w;
-    c.height = h;
+    const c = makeCanvas(w, h);
     const g = c.getContext('2d');
 
     g.translate(8, h * 0.5);
-
     const path = new Path2D();
     path.moveTo(0, 0);
 
@@ -100,32 +110,71 @@
 
     g.fillStyle = grad;
     g.fill(path);
-
     g.strokeStyle = 'rgba(255, 192, 204, 0.32)';
     g.lineWidth = 1.2;
     g.stroke(path);
-
     return c;
   }
 
   function makeCoreSprite(size = 120) {
-    const c = document.createElement('canvas');
-    c.width = c.height = size;
+    const c = makeCanvas(size, size);
     const g = c.getContext('2d');
-
     const r = size * 0.5;
     const grad = g.createRadialGradient(r, r, 1, r, r, r);
     grad.addColorStop(0, 'rgba(255, 190, 194, 0.95)');
     grad.addColorStop(0.2, 'rgba(255, 75, 86, 0.85)');
     grad.addColorStop(0.6, 'rgba(180, 22, 36, 0.55)');
     grad.addColorStop(1, 'rgba(0,0,0,0)');
-
     g.fillStyle = grad;
     g.beginPath();
     g.arc(r, r, r, 0, Math.PI * 2);
     g.fill();
-
     return c;
+  }
+
+  function makeTipSprite(size = 18) {
+    const c = makeCanvas(size, size);
+    const g = c.getContext('2d');
+    const r = size * 0.5;
+    const grad = g.createRadialGradient(r, r, 0, r, r, r);
+    grad.addColorStop(0, 'rgba(255, 214, 220, 0.95)');
+    grad.addColorStop(0.22, 'rgba(255, 162, 174, 0.82)');
+    grad.addColorStop(0.56, 'rgba(255, 108, 126, 0.22)');
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    g.fillStyle = grad;
+    g.beginPath();
+    g.arc(r, r, r, 0, Math.PI * 2);
+    g.fill();
+    return c;
+  }
+
+  function buildBackgroundLayer() {
+    const bg = makeCanvas(Math.max(1, Math.floor(state.width * state.pixelRatio)), Math.max(1, Math.floor(state.height * state.pixelRatio)));
+    const g = bg.getContext('2d');
+    g.scale(state.pixelRatio, state.pixelRatio);
+
+    const base = g.createLinearGradient(0, 0, 0, state.height);
+    base.addColorStop(0, '#050507');
+    base.addColorStop(0.45, '#0c070a');
+    base.addColorStop(1, '#040406');
+    g.fillStyle = base;
+    g.fillRect(0, 0, state.width, state.height);
+
+    const vignette = g.createRadialGradient(
+      state.centerX,
+      state.height * 0.34,
+      state.height * 0.1,
+      state.centerX,
+      state.height * 0.34,
+      state.height * 0.9
+    );
+    vignette.addColorStop(0, 'rgba(85, 12, 16, 0.14)');
+    vignette.addColorStop(0.42, 'rgba(26, 8, 10, 0.1)');
+    vignette.addColorStop(1, 'rgba(0, 0, 0, 0.64)');
+    g.fillStyle = vignette;
+    g.fillRect(0, 0, state.width, state.height);
+
+    backgroundLayer = bg;
   }
 
   function resize() {
@@ -135,7 +184,6 @@
 
     const w = Math.max(1, Math.floor(innerWidth * state.pixelRatio));
     const h = Math.max(1, Math.floor(innerHeight * state.pixelRatio));
-
     if (canvas.width !== w || canvas.height !== h) {
       canvas.width = w;
       canvas.height = h;
@@ -151,54 +199,43 @@
     state.height = innerHeight;
     state.centerX = state.width * 0.5;
     state.centerY = state.height * 0.56;
-    state.stemHeight = Math.min(state.height * 0.35, 300);
-    state.bloomRadius = Math.min(state.width, state.height) * 0.155;
+    state.stemHeight = Math.min(state.height * scene.stemHeightFactor, 300);
+    state.bloomRadius = Math.min(state.width, state.height) * scene.bloomRadiusFactor;
+
+    buildBackgroundLayer();
   }
 
   function drawBackground(t) {
-    const w = state.width;
-    const h = state.height;
-
-    const bg = ctx.createLinearGradient(0, 0, 0, h);
-    bg.addColorStop(0, '#050507');
-    bg.addColorStop(0.45, '#0c070a');
-    bg.addColorStop(1, '#040406');
-
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(backgroundLayer, 0, 0, backgroundLayer.width, backgroundLayer.height, 0, 0, state.width, state.height);
 
     const drift = Math.sin(t * 0.0002) * 0.5 + 0.5;
-    const vignetteY = h * (0.3 + drift * 0.06);
-
-    const vignette = ctx.createRadialGradient(
+    const hazeAlpha = 0.03 + drift * 0.03;
+    const hazeY = state.height * (0.28 + drift * 0.08);
+    const haze = ctx.createRadialGradient(
       state.centerX,
-      vignetteY,
-      h * 0.1,
+      hazeY,
+      state.height * 0.08,
       state.centerX,
-      vignetteY,
-      h * 0.9
+      hazeY,
+      state.height * 0.55
     );
-    vignette.addColorStop(0, 'rgba(85, 12, 16, 0.18)');
-    vignette.addColorStop(0.42, 'rgba(26, 8, 10, 0.12)');
-    vignette.addColorStop(1, 'rgba(0, 0, 0, 0.64)');
-
-    ctx.fillStyle = vignette;
-    ctx.fillRect(0, 0, w, h);
+    haze.addColorStop(0, `rgba(110, 16, 28, ${hazeAlpha})`);
+    haze.addColorStop(0.45, `rgba(34, 10, 14, ${hazeAlpha * 0.55})`);
+    haze.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = haze;
+    ctx.fillRect(0, 0, state.width, state.height);
   }
 
   function drawStem() {
     const x = state.centerX;
     const y0 = state.centerY + state.bloomRadius * 0.1;
     const y1 = y0 + state.stemHeight;
-
     const grad = ctx.createLinearGradient(x, y0, x, y1);
     grad.addColorStop(0, 'rgba(58, 132, 70, 0.58)');
     grad.addColorStop(1, 'rgba(24, 56, 33, 0.8)');
-
     ctx.strokeStyle = grad;
     ctx.lineCap = 'round';
     ctx.lineWidth = Math.max(2.2, state.bloomRadius * 0.07);
-
     ctx.beginPath();
     ctx.moveTo(x, y0);
     ctx.quadraticCurveTo(x + state.bloomRadius * 0.05, (y0 + y1) * 0.5, x - state.bloomRadius * 0.02, y1);
@@ -206,8 +243,6 @@
   }
 
   function drawPetals(t) {
-    const basePetals = 14;
-    const layers = 2;
     const pulse = 1 + Math.sin(t * 0.00125) * 0.035;
     const r = state.bloomRadius;
 
@@ -215,13 +250,13 @@
     ctx.translate(state.centerX, state.centerY);
     ctx.globalCompositeOperation = 'lighter';
 
-    for (let layer = 0; layer < layers; layer++) {
+    for (let layer = 0; layer < scene.petalLayers; layer++) {
       const layerScale = layer === 0 ? 1 : 0.78;
-      const layerRot = layer * (Math.PI / basePetals);
+      const layerRot = layer * (Math.PI / scene.petalsPerLayer);
       const alpha = layer === 0 ? 0.88 : 0.6;
 
-      for (let i = 0; i < basePetals; i++) {
-        const a = (i / basePetals) * Math.PI * 2 + layerRot;
+      for (let i = 0; i < scene.petalsPerLayer; i++) {
+        const a = (i / scene.petalsPerLayer) * Math.PI * 2 + layerRot;
         const sway = Math.sin(t * 0.001 + i * 0.7 + layer * 1.6) * 0.08;
         const radial = r * layerScale * (1 + Math.sin(t * 0.0015 + i) * 0.04);
 
@@ -260,67 +295,73 @@
 
       ctx.strokeStyle = i % 3 === 0 ? 'rgba(255, 136, 146, 0.58)' : 'rgba(244, 48, 66, 0.42)';
       ctx.lineWidth = i % 2 ? 1 : 1.4;
-
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.quadraticCurveTo(c1x, c1y, ex, ey);
       ctx.stroke();
 
       if ((i & 3) === 0) {
-        ctx.fillStyle = 'rgba(255, 164, 174, 0.76)';
-        ctx.beginPath();
-        ctx.arc(ex, ey, 1.15, 0, Math.PI * 2);
-        ctx.fill();
+        const s = i % 5 === 0 ? 9 : 7;
+        ctx.globalAlpha = 0.9;
+        ctx.drawImage(tipSprite, ex - s * 0.5, ey - s * 0.5, s, s);
       }
     }
 
+    ctx.globalAlpha = 1;
     ctx.restore();
   }
 
   function drawCore(t) {
     const s = state.bloomRadius * (1.24 + Math.sin(t * 0.0014) * 0.03);
-
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = 0.72;
     ctx.drawImage(glowSprite, state.centerX - s, state.centerY - s, s * 2, s * 2);
     ctx.globalAlpha = 0.9;
-
     const c = state.bloomRadius * 0.45;
     ctx.drawImage(coreSprite, state.centerX - c, state.centerY - c, c * 2, c * 2);
-
     ctx.globalCompositeOperation = 'source-over';
     ctx.restore();
   }
 
-  function adjustQuality(frameMs) {
+  function maybeChangeScale(nextScale, now) {
+    if (now - state.lastScaleChangeAt < cfg.scaleCooldownMs) return false;
+    if (Math.abs(nextScale - cfg.renderScale) < 0.001) return false;
+    cfg.renderScale = nextScale;
+    state.lastScaleChangeAt = now;
+    resize();
+    return true;
+  }
+
+  function adjustQuality(frameMs, now) {
     if (!cfg.adaptiveQuality) return;
 
     if (frameMs > cfg.budgetMs) {
       state.overBudgetStreak += 1;
       state.underBudgetStreak = 0;
-    } else {
+    } else if (frameMs < cfg.budgetMs * 0.78) {
       state.underBudgetStreak += 1;
+      state.overBudgetStreak = Math.max(0, state.overBudgetStreak - 1);
+    } else {
+      state.underBudgetStreak = Math.max(0, state.underBudgetStreak - 1);
       state.overBudgetStreak = Math.max(0, state.overBudgetStreak - 1);
     }
 
-    if (state.overBudgetStreak > 6) {
+    if (state.overBudgetStreak > 8) {
       state.overBudgetStreak = 0;
       if (state.qualityIdx < cfg.qualitySteps.length - 1) {
         state.qualityIdx += 1;
-      } else if (cfg.renderScale > cfg.minScale + 0.001) {
-        cfg.renderScale = Math.max(cfg.minScale, cfg.renderScale - 0.06);
-        resize();
+      } else {
+        maybeChangeScale(Math.max(cfg.minScale, cfg.renderScale - 0.05), now);
       }
     }
 
-    if (state.underBudgetStreak > 26) {
+    if (state.underBudgetStreak > 40) {
       state.underBudgetStreak = 0;
       if (state.qualityIdx > 0) {
         state.qualityIdx -= 1;
-      } else if (cfg.renderScale < cfg.maxScale - 0.001) {
-        cfg.renderScale = Math.min(cfg.maxScale, cfg.renderScale + 0.04);
-        resize();
+      } else {
+        maybeChangeScale(Math.min(cfg.maxScale, cfg.renderScale + 0.03), now);
       }
     }
   }
@@ -338,7 +379,6 @@
     }
 
     const t0 = performance.now();
-
     state.lastFrame = now - (delta % state.fpsInterval);
 
     drawBackground(now);
@@ -348,21 +388,19 @@
     drawCore(now);
 
     const frameMs = performance.now() - t0;
-    adjustQuality(frameMs);
-
+    adjustQuality(frameMs, now);
     requestAnimationFrame(render);
   }
 
   function togglePause() {
     state.paused = !state.paused;
-    if (!state.paused) {
-      state.lastFrame = performance.now();
-    }
+    if (!state.paused) state.lastFrame = performance.now();
   }
 
   glowSprite = makeGlowSprite(256);
   petalSprite = makePetalSprite(180, 42);
   coreSprite = makeCoreSprite(120);
+  tipSprite = makeTipSprite(18);
 
   resize();
   state.lastFrame = performance.now();
